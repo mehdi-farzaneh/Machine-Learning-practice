@@ -1,5 +1,4 @@
-# ML_practice
-Excersise of Machine Learning algorithms
+## Machine Learning Algorithms with example
 
-The codes were originally from the final tests of the Machine Learning Course (via Coursera) and in C++ language.
+The codes are based on the final tests of the Machine Learning Course (via Coursera) provided by California University.
 
