@@ -1,73 +1,93 @@
-%% Regularized Linear Regression and Bias-Variance
-clear ; close all; clc
+%% Regularized linear regression and bias-variance
+clear; close all; clc
 
-fprintf('Loading and Visualizing Data ...\n')
-load ('ex5data1.mat');% X, y, Xval, yval, Xtest, ytest
-m = size(X, 1);
+fprintf('Loading and visualizing data...\n');
+load('ex5data1.mat'); % Loads X, y, Xval, yval, Xtest, ytest
+
+numTrainExamples = size(X, 1);
+
+% Plot the training data.
+figure;
 plot(X, y, 'rx', 'MarkerSize', 10, 'LineWidth', 1.5);
 xlabel('Change in water level (x)');
 ylabel('Water flowing out of the dam (y)');
+title('Training data');
+
 fprintf('Press enter to continue.\n');
 pause;
 
-%% =========== Part 5: Learning Curve for Linear Regression =============
-lambda = 0;
-[error_train, error_val] = LinR.learningCurve([ones(m, 1) X], y, ...
-                  [ones(size(Xval, 1), 1) Xval], yval, lambda);
-plot(1:m, error_train, 1:m, error_val);
-title('Learning curve for linear regression')
-legend('Train', 'Cross Validation')
-xlabel('Number of training examples')
-ylabel('Error')
-axis([0 13 0 150])
+%% =========== Part 5: Learning curve for linear regression =============
+lambdaValue = 0;
+
+% Build the design matrix for training and validation sets.
+X_train = [ones(numTrainExamples, 1), X];
+X_val = [ones(size(Xval, 1), 1), Xval];
+
+[errorTrain, errorVal] = LinR.learningCurve(X_train, y, X_val, yval, ...
+    lambdaValue);
+
+figure;
+plot(1:numTrainExamples, errorTrain, 1:numTrainExamples, errorVal);
+title('Learning curve for linear regression');
+legend('Train', 'Cross Validation');
+xlabel('Number of training examples');
+ylabel('Error');
+axis([0 13 0 150]);
+
 fprintf('Press enter to continue.\n');
 pause;
 
-%% =========== Part 6: Feature Mapping for Polynomial Regression =========
-p = 8;
-X_poly = c_polyFeat(X, p);
-[X_poly, mu, sigma] = LinR.featureNormalize(X_poly);  % Normalize
-X_poly = [ones(m, 1), X_poly];  % Add Ones
+%% =========== Part 6: Feature mapping for polynomial regression =========
+polyDegree = 8;
 
-X_poly_test = LinR.polyFeat(Xtest, p);
+% Create polynomial features and normalize them.
+X_poly = c_polyFeat(X, polyDegree);
+[X_poly, mu, sigma] = LinR.featureNormalize(X_poly);
+X_poly = [ones(numTrainExamples, 1), X_poly];
+
+X_poly_test = LinR.polyFeat(Xtest, polyDegree);
 X_poly_test = bsxfun(@minus, X_poly_test, mu);
 X_poly_test = bsxfun(@rdivide, X_poly_test, sigma);
-X_poly_test = [ones(size(X_poly_test, 1), 1), X_poly_test]; % Add Ones
+X_poly_test = [ones(size(X_poly_test, 1), 1), X_poly_test];
 
-X_poly_val = LinR.polyFeat(Xval, p);
+X_poly_val = LinR.polyFeat(Xval, polyDegree);
 X_poly_val = bsxfun(@minus, X_poly_val, mu);
 X_poly_val = bsxfun(@rdivide, X_poly_val, sigma);
-X_poly_val = [ones(size(X_poly_val, 1), 1), X_poly_val];  % Add Ones
+X_poly_val = [ones(size(X_poly_val, 1), 1), X_poly_val];
 
-%% =========== Part 7: Learning Curve for Polynomial Regression ==========
-lambda = 0;
-[theta] = LinR.trainLinReg(X_poly, y, lambda);
+%% =========== Part 7: Learning curve for polynomial regression =========
+lambdaValue = 0;
+[theta] = LinR.trainLinReg(X_poly, y, lambdaValue);
+
 figure(1);
 plot(X, y, 'rx', 'MarkerSize', 10, 'LineWidth', 1.5);
-c_plotFit(min(X), max(X), mu, sigma, theta, p);
+c_plotFit(min(X), max(X), mu, sigma, theta, polyDegree);
 xlabel('Change in water level (x)');
 ylabel('Water flowing out of the dam (y)');
-title (sprintf('Polynomial Regression Fit (lambda = %f)', lambda));
+title(sprintf('Polynomial regression fit (lambda = %f)', lambdaValue));
 
 figure(2);
-[error_train, error_val] = ...
-    LinR.learningCurve(X_poly, y, X_poly_val, yval, lambda);
-plot(1:m, error_train, 1:m, error_val);
-title(sprintf('Polynomial Regression Learning Curve (lambda = %f)', ...
-    lambda));
-xlabel('Number of training examples')
-ylabel('Error')
-axis([0 13 0 100])
-legend('Train', 'Cross Validation')
+[errorTrain, errorVal] = LinR.learningCurve(X_poly, y, X_poly_val, yval, ...
+    lambdaValue);
+plot(1:numTrainExamples, errorTrain, 1:numTrainExamples, errorVal);
+title(sprintf('Polynomial regression learning curve (lambda = %f)', ...
+    lambdaValue));
+xlabel('Number of training examples');
+ylabel('Error');
+axis([0 13 0 100]);
+legend('Train', 'Cross Validation');
+
 fprintf('Press enter to continue.\n');
 pause;
 
-%% =========== Part 8: Validation for Selecting Lambda =============
-[lambda_vec, error_train, error_val] = ...
-    LinR.validationCurve(X_poly, y, X_poly_val, yval);
+%% =========== Part 8: Validation for selecting lambda =============
+[lambdaVec, errorTrain, errorVal] = LinR.validationCurve(X_poly, y, ...
+    X_poly_val, yval);
+
 close all;
-plot(lambda_vec, error_train, lambda_vec, error_val);
+figure;
+plot(lambdaVec, errorTrain, lambdaVec, errorVal);
 legend('Train', 'Cross Validation');
-xlabel('lambda');
+xlabel('\lambda');
 ylabel('Error');
 
