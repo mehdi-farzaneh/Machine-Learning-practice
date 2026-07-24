@@ -1,37 +1,50 @@
-%%  Logistic Regression with Regularization
-clear ; close all; clc
+%% Regularized logistic regression
+clear; close all; clc
 
+% Load the dataset with two features and binary labels.
 data = load('data2.txt');
-X = data(:, [1, 2]); y = data(:, 3);
-figure; 
+X = data(:, [1, 2]);
+y = data(:, 3);
+
+% Plot the two classes.
+figure;
 hold on;
-pos = find(y==1); neg = find(y == 0);
-plot(X(pos, 1), X(pos, 2), 'k+','LineWidth', 2, 'MarkerSize', 7);
-plot(X(neg, 1), X(neg, 2), 'ko', 'MarkerFaceColor', 'y', 'MarkerSize', 7);
+posIndex = find(y == 1);
+negIndex = find(y == 0);
+
+plot(X(posIndex, 1), X(posIndex, 2), 'k+', 'LineWidth', 2, 'MarkerSize', 7);
+plot(X(negIndex, 1), X(negIndex, 2), 'ko', 'MarkerFaceColor', 'y', 'MarkerSize', 7);
 hold on;
-xlabel('Microchip Test 1')
-ylabel('Microchip Test 2')
-legend('y = 1', 'y = 0')
+xlabel('Microchip test 1');
+ylabel('Microchip test 2');
+legend('y = 1', 'y = 0');
 hold off;
+
 fprintf('Press enter to continue.\n');
 pause;
 
-%% ======== Part 1: Regularized Logistic Regression and Accuracies =======
-X = LogR.mapping(X(:,1), X(:,2));
-initial_theta = zeros(size(X, 2), 1);
-lambda = 1;
-options = optimset('GradObj', 'on', 'MaxIter', 400);
-[theta, J, exit_flag] = ...
-      fminunc(@(t)(LogR.costfunRegul(t, X, y, lambda)), initial_theta, options);
+%% ======== Part 1: Fit regularized logistic regression and evaluate accuracy =======
+% Map the original features into a higher-dimensional space.
+X_mapped = LogR.mapping(X(:, 1), X(:, 2));
 
-LogR.boundary(theta, X, y);
+initialTheta = zeros(size(X_mapped, 2), 1);
+lambdaValue = 1;
+options = optimset('GradObj', 'on', 'MaxIter', 400);
+
+[theta, ~, ~] = fminunc(@(t)(LogR.costfunRegul(t, X_mapped, y, lambdaValue)), ...
+    initialTheta, options);
+
+% Plot the decision boundary.
+LogR.boundary(theta, X_mapped, y);
 hold on;
-title(sprintf('lambda = %g', lambda))
-xlabel('Microchip Test 1')
-ylabel('Microchip Test 2')
-legend('y = 1', 'y = 0', 'Decision boundary')
+title(sprintf('lambda = %g', lambdaValue));
+xlabel('Microchip test 1');
+ylabel('Microchip test 2');
+legend('y = 1', 'y = 0', 'Decision boundary');
 hold off;
 
-p = (sigmoid(X*theta) >= 0.5);
-fprintf('Train Accuracy: %f\n', mean(double(p == y)) * 100);
+% Evaluate training accuracy.
+predictedLabels = (sigmoid(X_mapped * theta) >= 0.5);
+trainingAccuracy = mean(double(predictedLabels == y)) * 100;
+fprintf('Train accuracy: %f\n', trainingAccuracy);
 
