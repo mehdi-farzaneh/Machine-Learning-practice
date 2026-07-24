@@ -1,75 +1,87 @@
-%% Neural Network Learning with back-propagation
-clear ; close all; clc
+%% Neural network learning with backpropagation
+clear; close all; clc
 
-input_layer_size  = 400;  % 20x20 Input Images of Digits
-hidden_layer_size = 25;   % 25 hidden units
-num_labels = 10;          % 10 labels, from 1 to 10 ("0" to label 10)
+inputLayerSize = 400;   % 20x20 input images of digits
+hiddenLayerSize = 25;   % 25 hidden units
+numLabels = 10;         % 10 labels, from 1 to 10 ("0" is labeled as 10)
 
-%% =========== Part 1: Loading and Visualizing Data =============
-fprintf('Loading and Visualizing Data ...\n')
+%% =========== Part 1: Load and visualize the data =============
+fprintf('Loading and visualizing data...\n');
 load('data2.mat');
+
 m = size(X, 1);
-% Randomly select 100 data points to display
-sel = randperm(size(X, 1));
-sel = sel(1:100);
-NN.displayData(X(sel, :));
+
+% Randomly select 100 examples to display.
+randomIndices = randperm(size(X, 1));
+selectedExamples = randomIndices(1:100);
+NN.displayData(X(selectedExamples, :));
+
 fprintf('Press enter to continue.\n');
 pause;
 
-%% ================ Part 2: Loading Parameters ================
-fprintf('\nLoading Saved Neural Network Parameters ...\n')
+%% ================ Part 2: Load pre-trained network parameters ================
+fprintf('\nLoading saved neural network parameters...\n');
 load('weights2.mat');
-nn_params = [Theta1(:) ; Theta2(:)];
 
-lambda = 0; % feedforward cost *without* regularization first
-J = NN.NNcostfun(nn_params, input_layer_size, hidden_layer_size, ...
-                   num_labels, X, y, lambda);
-                   
-lambda = 1; % feedforward cost *with* regularization first
-J = NN.NNcostfun(nn_params, input_layer_size, hidden_layer_size, ...
-                   num_labels, X, y, lambda);
+nnParams = [Theta1(:); Theta2(:)];
 
-%% ================ Part 6: Initializing Pameters ================
-fprintf('\nInitializing Neural Network Parameters ...\n')
-initial_Theta1 = NN.randInitWeights(input_layer_size, hidden_layer_size);
-initial_Theta2 = NN.randInitWeights(hidden_layer_size, num_labels);
-% Unroll parameters
-initial_nn_params = [initial_Theta1(:) ; initial_Theta2(:)];
+% Evaluate the cost with and without regularization.
+lambdaValue = 0;
+J = NN.NNcostfun(nnParams, inputLayerSize, hiddenLayerSize, numLabels, X, y, lambdaValue);
 
-NN.checkNNGrad; % Backpropagation *without* regularization 
-lambda = 3;
-NN.checkNNGrad(lambda); % Backpropagation *with* regularization 
+lambdaValue = 1;
+J = NN.NNcostfun(nnParams, inputLayerSize, hiddenLayerSize, numLabels, X, y, lambdaValue);
 
-debug_J  = NN.NNcostfun(nn_params, input_layer_size, ...
-                          hidden_layer_size, num_labels, X, y, lambda);
-fprintf(['\n\nCost at (fixed) debugging parameters (w/ lambda = %f): %f '], ...
-          lambda, debug_J);
+%% ================ Part 3: Initialize network parameters ================
+fprintf('\nInitializing neural network parameters...\n');
+
+initialTheta1 = NN.randInitWeights(inputLayerSize, hiddenLayerSize);
+initialTheta2 = NN.randInitWeights(hiddenLayerSize, numLabels);
+
+% Unroll the parameters into a single vector for optimization.
+initialNNParams = [initialTheta1(:); initialTheta2(:)];
+
+% Check gradient computation with and without regularization.
+NN.checkNNGrad;
+lambdaValue = 3;
+NN.checkNNGrad(lambdaValue);
+
+debugCost = NN.NNcostfun(nnParams, inputLayerSize, hiddenLayerSize, numLabels, X, y, lambdaValue);
+fprintf('\n\nCost at (fixed) debugging parameters (with lambda = %f): %f\n', ...
+    lambdaValue, debugCost);
+
 fprintf('Press enter to continue.\n');
 pause;
 
-%% =================== Part 8: Training NN ===================
-fprintf('\nTraining Neural Network... \n')
+%% =================== Part 4: Train the neural network ===================
+fprintf('\nTraining neural network...\n');
+
 options = optimset('MaxIter', 50);
-lambda = 1; % try different values 
-costFunction = @(p) NN.NNcostfun(p, input_layer_size, ...
-                                   hidden_layer_size, ...
-                                   num_labels, X, y, lambda);
-% costFunction takes in only the neural network parameters
-[nn_params, cost] = fmincg(costFunction, initial_nn_params, options);
-Theta1 = reshape(nn_params(1:hidden_layer_size * (input_layer_size + 1)), ...
-                 hidden_layer_size, (input_layer_size + 1));
-Theta2 = reshape(nn_params((1 + (hidden_layer_size * (input_layer_size + 1))):end), ...
-                 num_labels, (hidden_layer_size + 1));
+lambdaValue = 1;
+
+costFunction = @(params) NN.NNcostfun(params, inputLayerSize, hiddenLayerSize, ...
+    numLabels, X, y, lambdaValue);
+
+[nnParams, ~] = fmincg(costFunction, initialNNParams, options);
+
+% Reshape the optimized parameter vector back into weight matrices.
+Theta1 = reshape(nnParams(1:hiddenLayerSize * (inputLayerSize + 1)), ...
+    hiddenLayerSize, inputLayerSize + 1);
+Theta2 = reshape(nnParams((1 + hiddenLayerSize * (inputLayerSize + 1)):end), ...
+    numLabels, hiddenLayerSize + 1);
+
 fprintf('Press enter to continue.\n');
 pause;
 
-%% ================= Part 9: Visualize Weights =================
-fprintf('\nVisualizing Neural Network... \n')
+%% ================= Part 5: Visualize the learned weights =================
+fprintf('\nVisualizing neural network...\n');
 NN.displayData(Theta1(:, 2:end));
+
 fprintf('\nPress enter to continue.\n');
 pause;
 
-%% ================= Part 10: Implement Predict =================
-pred = NN.predict2(Theta1, Theta2, X);
-fprintf('\nTraining Set Accuracy: %f\n', mean(double(pred == y)) * 100);
+%% ================= Part 6: Make predictions =================
+predictions = NN.predict2(Theta1, Theta2, X);
+trainingAccuracy = mean(double(predictions == y)) * 100;
+fprintf('\nTraining set accuracy: %f\n', trainingAccuracy);
 

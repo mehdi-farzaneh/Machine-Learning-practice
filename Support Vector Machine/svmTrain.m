@@ -1,8 +1,7 @@
-function [model] = svmTrain(X, Y, C, kernelFunction, ...
-    tol, max_passes)
-% using an optimized package such as:
-%           LIBSVM   (http://www.csie.ntu.edu.tw/~cjlin/libsvm/)
-%           SVMLight (http://svmlight.joachims.org/)
+function [model] = svmTrain(X, Y, C, kernelFunction, tol, max_passes)
+% Train a support vector machine using a simplified SMO-style algorithm.
+% The implementation follows the standard SVM training approach for binary
+% classification with a user-supplied kernel function.
 
 if ~exist('tol', 'var') || isempty(tol)
     tol = 1e-3;
@@ -13,7 +12,7 @@ end
 
 m = size(X, 1);
 n = size(X, 2);
-Y(Y==0) = -1;
+Y(Y == 0) = -1;
 
 alphas = zeros(m, 1);
 b = 0;
@@ -23,54 +22,48 @@ eta = 0;
 L = 0;
 H = 0;
 
+% Pre-compute the kernel matrix.
 if strcmp(func2str(kernelFunction), 'linearKernel')
-    K = X*X';
+    K = X * X';
 elseif strfind(func2str(kernelFunction), 'gaussianKernel')
     X2 = sum(X.^2, 2);
-    K = bsxfun(@plus, X2, bsxfun(@plus, X2', - 2 * (X * X')));
+    K = bsxfun(@plus, X2, bsxfun(@plus, X2', -2 * (X * X')));
     K = kernelFunction(1, 0) .^ K;
 else
-    % Pre-compute the Kernel Matrix
-    % The following can be slow due to the lack of vectorization
+    % For custom kernels, compute the matrix directly.
     K = zeros(m);
     for i = 1:m
         for j = i:m
-            K(i,j) = kernelFunction(X(i,:)', X(j,:)');
-            K(j,i) = K(i,j); %the matrix is symmetric
+            K(i, j) = kernelFunction(X(i, :)', X(j, :)');
+            K(j, i) = K(i, j);
         end
     end
 end
 
-% Train
 fprintf('\nTraining ...');
 dots = 12;
-while passes < max_passes,
 
-    num_changed_alphas = 0;
-    for i = 1:m,
+while passes < max_passes
+    numChangedAlphas = 0;
 
-        % Calculate Ei = f(x(i)) - y(i) using (2).
-        % E(i) = b + sum (X(i, :) * (repmat(alphas.*Y,1,n).*X)') - Y(i);
-        E(i) = b + sum (alphas.*Y.*K(:,i)) - Y(i);
+    for i = 1:m
+        % Evaluate the decision function error for the current example.
+        E(i) = b + sum(alphas .* Y .* K(:, i)) - Y(i);
 
-        if ((Y(i)*E(i) < -tol && alphas(i) < C) || (Y(i)*E(i) > tol && alphas(i) > 0)),
-
-            % In practice, there are many heuristics one can use to select
-            % the i and j. In this simplified code, we select them randomly.
+        if ((Y(i) * E(i) < -tol && alphas(i) < C) || (Y(i) * E(i) > tol && alphas(i) > 0))
+            % Select a second example j at random.
             j = ceil(m * rand());
-            while j == i,  % Make sure i \neq j
+            while j == i
                 j = ceil(m * rand());
             end
 
-            % Calculate Ej = f(x(j)) - y(j) using (2).
-            E(j) = b + sum (alphas.*Y.*K(:,j)) - Y(j);
+            E(j) = b + sum(alphas .* Y .* K(:, j)) - Y(j);
 
-            % Save old alphas
-            alpha_i_old = alphas(i);
-            alpha_j_old = alphas(j);
+            alphaIOld = alphas(i);
+            alphaJOld = alphas(j);
 
-            % Compute L and H by (10) or (11).
-            if (Y(i) == Y(j)),
+            % Compute bounds L and H for the alpha update.
+            if Y(i) == Y(j)
                 L = max(0, alphas(j) + alphas(i) - C);
                 H = min(C, alphas(j) + alphas(i));
             else
@@ -78,58 +71,49 @@ while passes < max_passes,
                 H = min(C, C + alphas(j) - alphas(i));
             end
 
-            if (L == H)
-                % continue to next i.
+            if L == H
                 continue;
             end
 
-            % Compute eta by (14).
-            eta = 2 * K(i,j) - K(i,i) - K(j,j);
-            if (eta >= 0)
-                % continue to next i.
+            % Compute eta for the update step.
+            eta = 2 * K(i, j) - K(i, i) - K(j, j);
+            if eta >= 0
                 continue;
             end
 
-            % Compute and clip new value for alpha j using (12) and (15).
+            % Update alpha_j and clip it to the valid range.
             alphas(j) = alphas(j) - (Y(j) * (E(i) - E(j))) / eta;
+            alphas(j) = min(H, alphas(j));
+            alphas(j) = max(L, alphas(j));
 
-            % Clip
-            alphas(j) = min (H, alphas(j));
-            alphas(j) = max (L, alphas(j));
-
-            % Check if change in alpha is significant
-            if (abs(alphas(j) - alpha_j_old) < tol)
-                % continue to next i.
-                % replace anyway
-                alphas(j) = alpha_j_old;
+            % If the alpha change is too small, skip the update.
+            if abs(alphas(j) - alphaJOld) < tol
+                alphas(j) = alphaJOld;
                 continue;
             end
 
-            % Determine value for alpha i using (16).
-            alphas(i) = alphas(i) + Y(i)*Y(j)*(alpha_j_old - alphas(j));
+            % Update alpha_i.
+            alphas(i) = alphas(i) + Y(i) * Y(j) * (alphaJOld - alphas(j));
 
-            % Compute b1 and b2 using (17) and (18) respectively.
-            b1 = b - E(i) ...
-                - Y(i) * (alphas(i) - alpha_i_old) *  K(i,j)' ...
-                - Y(j) * (alphas(j) - alpha_j_old) *  K(i,j)';
-            b2 = b - E(j) ...
-                - Y(i) * (alphas(i) - alpha_i_old) *  K(i,j)' ...
-                - Y(j) * (alphas(j) - alpha_j_old) *  K(j,j)';
+            % Compute the new bias term using the updated alphas.
+            b1 = b - E(i) - Y(i) * (alphas(i) - alphaIOld) * K(i, j)' - ...
+                Y(j) * (alphas(j) - alphaJOld) * K(i, j)';
+            b2 = b - E(j) - Y(i) * (alphas(i) - alphaIOld) * K(i, j)' - ...
+                Y(j) * (alphas(j) - alphaJOld) * K(j, j)';
 
-            % Compute b by (19).
-            if (0 < alphas(i) && alphas(i) < C)
+            if 0 < alphas(i) && alphas(i) < C
                 b = b1;
-            elseif (0 < alphas(j) && alphas(j) < C)
+            elseif 0 < alphas(j) && alphas(j) < C
                 b = b2;
             else
-                b = (b1+b2)/2;
+                b = (b1 + b2) / 2;
             end
 
-            num_changed_alphas = num_changed_alphas + 1;
+            numChangedAlphas = numChangedAlphas + 1;
         end
     end
 
-    if (num_changed_alphas == 0)
+    if numChangedAlphas == 0
         passes = passes + 1;
     else
         passes = 0;
@@ -147,13 +131,12 @@ while passes < max_passes,
 end
 fprintf(' Done! \n\n');
 
-% Save the model
-idx = alphas > 0;
-model.X= X(idx,:);
-model.y= Y(idx);
+% Save the learned model.
+activeIndices = alphas > 0;
+model.X = X(activeIndices, :);
+model.y = Y(activeIndices);
 model.kernelFunction = kernelFunction;
-model.b= b;
-model.alphas= alphas(idx);
-model.w = ((alphas.*Y)'*X)';
-
+model.b = b;
+model.alphas = alphas(activeIndices);
+model.w = ((alphas .* Y)' * X)';
 end
